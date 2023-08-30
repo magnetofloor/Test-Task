@@ -24,7 +24,7 @@ func main() {
 	router.HandleFunc("/del_key/{key}", DelKeyHandler).Methods("DELETE")
 
 	http.Handle("/", router)
-	http.ListenAndServe(":8082", nil)
+	http.ListenAndServe(":8080", nil)
 }
 
 func SetKeyHandler(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +38,7 @@ func SetKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprint(w, "OK")
+	fmt.Fprint(w, "OK Set"+key+" "+value)
 }
 
 func GetKeyHandler(w http.ResponseWriter, r *http.Request) {
@@ -66,5 +66,5 @@ func DelKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprint(w, "OK")
+	fmt.Fprint(w, "OK del")
 }
