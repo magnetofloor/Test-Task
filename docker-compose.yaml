@@ -1,0 +1,21 @@
+version: '3.3'
+services:
+  app:
+    build:
+      context: ./app
+    ports:
+      - "8080:8082"
+    depends_on:
+      - redis
+  redis:
+    build: ./redis
+    #command: ["redis-server", "--requirepass", "yourpassword"]
+    ports:
+      - "6379:6379"
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "8089:80"
+    depends_on:
+      - app
