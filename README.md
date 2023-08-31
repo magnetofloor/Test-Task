@@ -12,7 +12,7 @@ curl -i -L -H "Content-Type: application/json" -d '{"key":"mykey","value":"myval
 ```
 ## Get
 ```
-curl -i -L "http://127.0.0.1:8080/get_key?key=mykey"
+curl -i -L "http://127.0.0.1:8089/get_key?key=mykey"
 ```
 ## Delete
 ```
