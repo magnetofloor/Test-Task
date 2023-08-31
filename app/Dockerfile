@@ -1,14 +1,6 @@
-FROM golang:1.20 AS build
+FROM golang:1.20-bullseye AS build
 WORKDIR /app
 COPY ./src /app
-RUN ls /app
-RUN go mod download
+#RUN go mod download
 RUN go build -o app
-RUN ls /app
 CMD ["/app/app"]
-
-#FROM debian:buster-slim
-#WORKDIR /
-#COPY --from=build /app/app .
-#RUN ls /
-#CMD ["/app"]

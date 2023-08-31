@@ -2,69 +2,128 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"github.com/redis/go-redis/v9"
 	"net/http"
+	"os"
 )
 
-var ctx = context.Background()
-var rdb *redis.Client
+type KeyValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 
-func main() {
+var (
+	ctx context.Context
+	rdb *redis.Client
+)
+
+func init() {
+	ctx = context.Background()
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     "redis:6379",
-		Password: "",
+		Addr:     os.Getenv("REDIS_ADDR"),
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
+}
 
-	router := mux.NewRouter()
-	router.HandleFunc("/set_key/{key}/{value}", SetKeyHandler).Methods("POST")
-	router.HandleFunc("/get_key/{key}", GetKeyHandler).Methods("GET")
-	router.HandleFunc("/del_key/{key}", DelKeyHandler).Methods("DELETE")
+func main() {
+	http.HandleFunc("/set_key", SetKeyHandler)
+	http.HandleFunc("/get_key", GetKeyHandler)
+	http.HandleFunc("/del_key", DelKeyHandler)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+	})
 
-	http.Handle("/", router)
 	http.ListenAndServe(":8080", nil)
 }
 
 func SetKeyHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	key := vars["key"]
-	value := vars["value"]
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method must be POST", http.StatusMethodNotAllowed)
+		return
+	}
 
+	// read json data
+	var keyValue KeyValue
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&keyValue); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	key := keyValue.Key
+	value := keyValue.Value
+
+	if key == "" || value == "" {
+		http.Error(w, "Both key and value must be provided", http.StatusBadRequest)
+		return
+	}
+
+	// set data to db
 	err := rdb.Set(ctx, key, value, 0).Err()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Fprint(w, "OK Set"+key+" "+value)
+	fmt.Fprint(w, "Operation SET is successful\n")
 }
 
 func GetKeyHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	key := vars["key"]
+	key := r.FormValue("key")
+
+	if key == "" {
+		http.Error(w, "Key must be provided\n", http.StatusBadRequest)
+		return
+	}
 
 	value, err := rdb.Get(ctx, key).Result()
 	if err == redis.Nil {
-		value = "Key not found"
+		http.Error(w, "Cannot find key: "+key, http.StatusNotFound)
+		return
 	} else if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Fprint(w, value)
-}
-
-func DelKeyHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	key := vars["key"]
-
-	_, err := rdb.Del(ctx, key).Result()
-	if err != nil {
+	// generate response
+	response := map[string]string{
+		"value": value,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
 
-	fmt.Fprint(w, "OK del")
+func DelKeyHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method must be DELETE", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// read json data
+	var keyValue KeyValue
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&keyValue); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if keyValue.Key == "" {
+		http.Error(w, "Key must be provided", http.StatusBadRequest)
+		return
+	}
+
+	// delete by key
+	value, err := rdb.GetDel(ctx, keyValue.Key).Result()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	fmt.Fprint(w, "DELETE "+value+"\n")
 }
