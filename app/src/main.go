@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/redis/go-redis/v9"
+	"io"
 	"net/http"
 	"os"
 )
@@ -76,6 +77,14 @@ func SetKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetKeyHandler(w http.ResponseWriter, r *http.Request) {
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}(r.Body)
+
 	key := r.FormValue("key")
 
 	if key == "" {
